@@ -19,8 +19,8 @@ gpuTimes = []
 for i in gpuData:
 	 gpuTimes.append( float( i ) )
 gpuInputs = []
-N = 32;
-while N < 1000000:
+N = 64;
+while N < 1100000:
 	gpuInputs.append(N)
 	N = N*2
 # gpuInputs = [i for i in range(100, 5100, 100)]
@@ -45,7 +45,11 @@ del cpuData[-1]  #x.remove(len(x)-1)
 cpuTimes = []
 for i in cpuData:
 	 cpuTimes.append( float( i ) )
-cpuInputs = [i for i in range(10000, 1060000, 50000)]
+cpuInputs = []
+N = 64;
+while N < 1100000:
+	cpuInputs.append(N)
+	N = N*2
 plt.plot( cpuInputs,cpuTimes, color="blue", label="CPU")
 
 #expCurve = np.polyfit(cpuInputs, np.log(cpuTimes), 1)

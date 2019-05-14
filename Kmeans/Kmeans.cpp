@@ -6,30 +6,6 @@
 #include <cmath>
 #include <vector>
 
-/***********
-CUDA kernels
-***********/
-
-__global__
-void generatePoints(Point*& data,int min2,int dataSize)
-{
-
-  	int index =  blockIdx.x * blockDim.x + threadIdx.x;
-
-	if( index < dataSize )
-	{
-		Point p;
-		p.x = min1 + rand() % (max1 - min1);
-		p.y = min1 + rand() % (max1 - min1);
-		data[index] = p;
-	}
-}
-
-__global__
-
-
-
-
 
 class Point
 {
@@ -50,17 +26,14 @@ float getDistance(const Point& p1, const Point& p2)
 
 
 
-/*
-Group size
 
-*/
-int main(int argc, char* argv[])
+int main()
 {
-	if( argc < 2 )
-	{
-		std::cout << "Usage:  ./a.out <data points> \n";
-		exit();
-	}
+	// deliberate partitioning into clusters
+	// testing the algorithm
+	const int min1 = 0, max1 = 25;
+	const int min2 = 25, max2 = 50;
+	const int groupSize = 25;
 
 	unsigned seed = time(0);
 	srand(seed);
@@ -71,22 +44,8 @@ int main(int argc, char* argv[])
 	// these are the centers we expect to get at the end
 	Point expected1, expected2;
 	float sumX = 0, sumY = 0;
-	// std::vector<Point> data;
-	Point* data;
-	// deliberate partitioning into clusters
-	const int dataSize = atoi(argv[1]);
-	const int min1 = 0, max1 = dataSize/2;
-	const int min2 = max1+1, max2 = dataSize;
+	std::vector<Point> data;
 
-    cudaMallocManaged( &data, dataSize * sizeof(Point) );
-
-
-    int blockSize = 1024;
-    int numBlocks = (groupSize + blockSize - 1) / blockSize;
-    generatePoints<<<numBlocks,blockSize>>>(data, min2, dataSize);
-    cudaDeviceSynchronize();
-
-	/*
 	for(int i = 0; i < groupSize; ++i)
 	{
 		Point p;
@@ -96,7 +55,6 @@ int main(int argc, char* argv[])
 		sumY += p.y;
 		data.push_back(p);
 	}
-	*/
 	expected1.x = sumX/groupSize;
 	expected1.y = sumY/groupSize;
 

@@ -43,7 +43,7 @@ plt.plot( dynamicInputs,dynamicTimes, color="blue", label="Blocks * threads = 10
 
 
 
-plt.xlabel("Dimension")
+plt.xlabel("Thread/Block Size")
 plt.ylabel("Time(msec)")
 plt.legend()
 plt.title("Vector addition: Increasing thread/block count")
