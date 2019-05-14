@@ -27,17 +27,26 @@ float getDistance(const Point& p1, const Point& p2)
 
 
 
-int main()
+int main(int argc, char* argv[])
 {
-	// deliberate partitioning into clusters
-	// testing the algorithm
-	const int min1 = 0, max1 = 25;
-	const int min2 = 25, max2 = 50;
-	const int groupSize = 25;
+
+	if( argc < 2 )
+	{
+		std::cout << "Usage:  ./a.out <data points> \n";
+		exit(1);
+	}
 
 	unsigned seed = time(0);
 	srand(seed);
 
+
+	
+	// std::vector<Point> data;
+	// deliberate partitioning into clusters
+	const int dataSize = atoi(argv[1]);
+	const int groupSize = dataSize/2;
+	const int min1 = 0, max1 = groupSize;
+	const int min2 = max1+1, max2 = dataSize;
 
 	
 

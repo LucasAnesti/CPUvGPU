@@ -1,4 +1,3 @@
-
 #include <ctime> 
 #include <cstdlib> 
 #include <iostream>
@@ -14,9 +13,9 @@
 class Point
 {
 public:
-	float x = 0;
-	float y = 0;
-	int group = 0;
+	float x;
+	float y;
+	int group;
 };
 
 
@@ -33,8 +32,11 @@ float getDistance(const Point& p1, const Point& p2)
 CUDA kernels
 ***********/
 
+
+
+// casting r1 and r2 into int to use %
 __global__
-void generatePoints(Point*& data,int minvalue, int maxvalue, int dataSize)
+void generatePoints(Point* data,int minvalue, int maxvalue, int dataSize, int r1, int r2)
 {
 
   	int index =  blockIdx.x * blockDim.x + threadIdx.x;
@@ -42,8 +44,8 @@ void generatePoints(Point*& data,int minvalue, int maxvalue, int dataSize)
 	if( index < dataSize )
 	{
 		Point p;
-		p.x = minvalue + rand() % (maxvalue - minvalue);
-		p.y = minvalue + rand() % (maxvalue - minvalue);
+		p.x = float( minvalue + r1 % (maxvalue - minvalue) );
+		p.y = float( minvalue + r2 % (maxvalue - minvalue));
 		data[index] = p;
 	}
 }
@@ -81,7 +83,7 @@ int main(int argc, char* argv[])
 
     int blockSize = 1024;
     int numBlocks = (dataSize + blockSize - 1) / blockSize;
-    generatePoints<<<numBlocks,blockSize>>>(data, min1, max1, max1-min1);
+    generatePoints<<<numBlocks,blockSize>>>(data, min1, max1, max1-min1, rand(), rand());
     cudaDeviceSynchronize();
 
 
@@ -96,7 +98,7 @@ int main(int argc, char* argv[])
 	expected1.x = sumX/groupSize;
 	expected1.y = sumY/groupSize;
 
-    generatePoints<<<numBlocks,blockSize>>>(data, min2, max2, max2-min2);
+    generatePoints<<<numBlocks,blockSize>>>(data, min2, max2, max2-min2, rand(), rand());
     cudaDeviceSynchronize();
 	sumX = 0, sumY = 0;
 	for(int i = 0 + min2; i < max2; ++i)
@@ -181,16 +183,9 @@ int main(int argc, char* argv[])
 
 	std::cout << "Center1 = (" << center1.x << ", " 
 							   << center1.y << ")\n";
-	std::cout << "Center1 = (" << center2.x << ", " 
+	std::cout << "Center2 = (" << center2.x << ", " 
 							   << center2.y << ")\n";
 
 
 }
-
-
-
-
-
-
-
 
