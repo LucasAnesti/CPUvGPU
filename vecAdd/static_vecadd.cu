@@ -6,11 +6,6 @@
      nvcc add.cu -o add_cuda.out
 *******************************/
 
-/*
-A program that increments thread count by 32 and times the result of
-vector addition. Block size remains static = 1.
-*/
-
 
 #include <iostream>
 #include <math.h>
@@ -25,9 +20,9 @@ __global__
 void add(int n, float *x, float *y)
 {
   // index of the current thread within the block
-  int index = threadIdx.x;
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
   // number of threads in a block
-  int stride = blockDim.x;
+  int stride = blockDim.x * gridDim.x;
 
   // run each addition on a separate thread
   for (int i = index; i < n; i+=stride)
@@ -66,13 +61,15 @@ int main(void)
 
     std::clock_t stop = clock();
     int duration = 1000 * (stop - start) / (double)CLOCKS_PER_SEC;
-    std::cout << "Running time using " << t << " threads = " << duration << "\n"; 
+    //std::cout << "Running time using " << t << " threads = " << duration << "\n"; 
+    std::cout << duration << "\n";
 
     // Check for errors (all values should be 3.0f)
-    float maxError = 0.0f;
+    /*float maxError = 0.0f;
     for (int i = 0; i < N; i++)
       maxError = fmax(maxError, fabs(y[i]-3.0f));
     std::cout << "Max error: " << maxError << std::endl;
+    */
 
     // Deallocating memory using cudaFree()
     cudaFree(x);

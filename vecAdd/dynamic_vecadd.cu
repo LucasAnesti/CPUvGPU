@@ -9,8 +9,6 @@
 /*
 Program that runs increasing input size and determines block size  dynamically
 as a function of input.
-
-  blocksize * blockNum = 1024
 */
 
 #include <iostream>
@@ -26,9 +24,9 @@ __global__
 void add(int n, float *x, float *y)
 {
   // index of the current thread within the block
-  int index = threadIdx.x;
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
   // number of threads in a block
-  int stride = blockDim.x;
+  int stride = blockDim.x * gridDim.x;
 
   // run each addition on a separate thread
   for (int i = index; i < n; i+=stride)
@@ -40,7 +38,7 @@ void add(int n, float *x, float *y)
 
 int main(void)
 {
-  for(int t = 32; t <= 1024; t*=2)
+  for(int t = 256; t <= 1024; t+=32)
   {
     int N = 1<<24; // 2^24 elements
 
@@ -59,9 +57,8 @@ int main(void)
 
     std::clock_t start = clock();
     // Launch the 'add' kernel, which invokes it in the GPU
-    //  blockSize * numBlocks = 1024;
     int blockSize = t;
-    int numBlocks = 1024/t;
+    int numBlocks = (N + blockSize - 1) / blockSize;
     // std::cout << "NumBlocks = " << numBlocks << "\n";
     add<<<numBlocks,blockSize>>>(N, x, y);
     
