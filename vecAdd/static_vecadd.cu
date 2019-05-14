@@ -1,3 +1,9 @@
+/* 
+A program that shows the effect of increasing the thread count
+while keeping the input size and block count constant.
+Performance is improved as the number of threads increase.
+*/
+
 /*******************************
 1 - Install nvidia-cuda-toolkit
 

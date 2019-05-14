@@ -1,3 +1,4 @@
+
 /*******************************
 1 - Install nvidia-cuda-toolkit
 
@@ -7,8 +8,10 @@
 *******************************/
 
 /*
-Program that runs increasing input size and determines block size  dynamically
-as a function of input.
+Program that runs block size dynamically. As the number of threads increase,
+the number of blocks is determined as a function of threads and input size.
+This provides a constant optimal performance even though the number of threads 
+change 
 */
 
 #include <iostream>
@@ -38,7 +41,7 @@ void add(int n, float *x, float *y)
 
 int main(void)
 {
-  for(int t = 256; t <= 1024; t+=32)
+  for(int t = 32; t <= 1024; t+=32)
   {
     int N = 1<<24; // 2^24 elements
 
@@ -59,7 +62,7 @@ int main(void)
     // Launch the 'add' kernel, which invokes it in the GPU
     int blockSize = t;
     int numBlocks = (N + blockSize - 1) / blockSize;
-    // std::cout << "NumBlocks = " << numBlocks << "\n";
+    std::cout << "BlockSize = " << t << ",NumBlocks = " << numBlocks << "\n";
     add<<<numBlocks,blockSize>>>(N, x, y);
     
 
