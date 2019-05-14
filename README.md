@@ -4,9 +4,9 @@ CPU vs GPU
 ==========
 CS3339 Architecture Project by students
 
-Chris W
-Matt Larson
-Lucas Anesti
+* Chris W,
+* Matt Larson,
+* Lucas Anesti
 
 Purpose
 -------
