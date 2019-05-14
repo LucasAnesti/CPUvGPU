@@ -1,0 +1,19 @@
+Running the following command on capi:
+
+	nvcc -Xptxas -v occCubin.cu
+
+yields minformation about:
+  rgisters per thread
+  shared memory per thread block
+
+These values can be used to calculate occupancy.
+Sample output:
+
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z3addiPfS_' for 'sm_30'
+ptxas info    : Function properties for _Z3addiPfS_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, 344 bytes cmem[0]
+
+This shows shared memory = 30 and shared registers = 8
+

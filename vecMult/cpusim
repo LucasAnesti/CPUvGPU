@@ -1,0 +1,14 @@
+
+
+echo "" > cpu.out
+
+for i in {0..1300..64}
+do
+  { time ./cmm $i 0 ; } &>> cpu.out
+done
+
+
+
+grep real cpu.out >  cpu.temp 
+grep -Eo '[0-9]\.[0-9]+' cpu.temp > cpu.times
+

@@ -1,0 +1,13 @@
+
+echo "" > gpu.out
+
+for i in {0..4096..64}
+do
+  { time ./gmm $i 0 ; } &>> gpu.out
+done
+
+
+
+grep real gpu.out >  gpu.temp 
+grep -Eo '[0-9]\.[0-9]+' gpu.temp > gpu.times
+

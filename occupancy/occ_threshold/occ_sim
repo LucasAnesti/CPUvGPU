@@ -1,0 +1,18 @@
+# measure time perforamnce of occ.cu for
+# input sizes of 2^N for 1 < N < 31
+
+echo "" > sim.out
+
+N=1
+while [ $N -lt 31 ]
+do
+  echo $N
+  { time ./occ $N ; } &>> sim.out
+  N=$[ $N + 1 ]
+done
+
+
+grep real sim.out > temp
+echo 'done'
+grep -Eo '[0-9]+\.[0-9]+' temp > times
+

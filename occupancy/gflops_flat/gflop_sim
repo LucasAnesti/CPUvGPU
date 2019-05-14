@@ -1,0 +1,25 @@
+echo ""> sim.out
+
+N=32
+i=1
+while [ $i -lt 25 ]
+do
+  echo $N
+  { ./matrixMul -wA=$N -hA=$N -wB=$N -hB=$N ; } &>> sim.out
+  { time ./matrixMul -wA=$N -hA=$N -wB=$N -hB=$N ; } &>> time.out
+  N=$[ $i * 32 ]
+  i=$[ $i + 1 ]
+done
+
+
+grep "Perf*" sim.out > temp
+
+grep -Eo '[0-9]+\.[0-9]+ G' temp > temp2
+grep -Eo '[0-9]+\.[0-9]+' temp2 > perf
+
+grep -Eo '[0-9]+\.[0-9]+ msec' temp > temp2
+grep -Eo '[0-9]+\.[0-9]+' temp2 > msec
+
+grep real time.out >  temp3
+grep -Eo '[0-9]\.[0-9]+' temp3 > times
+
