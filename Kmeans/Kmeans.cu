@@ -15,6 +15,7 @@ public:
 	int group = 1;
 };
 
+
 __device__
 float getDistance(const Point& p1, const Point& p2)
 {
@@ -43,15 +44,15 @@ void setFalse(bool*& membershipChanged, int dataSize)
 // one group to another
 __global__
 void findGroup(Point*& data, int dataSize, 
-	 		   const Point& center1, const Point& center2, bool*& moved) 
+	 		   Point* dev_centers, bool*& moved) 
 {
 	int p =  blockIdx.x * blockDim.x + threadIdx.x;
 
 	//for( int p = 0; p < dataSize; ++p)
 	if(p < dataSize)
 	{
-		float d1 = getDistance(center1, data[p]);
-		float d2 = getDistance(center2, data[p]);
+		float d1 = getDistance(dev_centers[0], data[p]);
+		float d2 = getDistance(dev_centers[1], data[p]);
 		int oldGroup = data[p].group;
 
 		if (d1 < d2) data[p].group = 1;
@@ -64,39 +65,48 @@ void findGroup(Point*& data, int dataSize,
 	}
 }
 
+
+// a CUDA kernel that traverses the "moved" status for each point
+// and sets the dev_pointMoved variable to false if one is found
 __global__
-void findMoved(bool* moved, int dataSize, bool& pointMoved)
+void findMoved(bool* moved, int dataSize, bool* dev_pointMoved)
 {
 	int index = 0;
-	while( index < dataSize && ! pointMoved )
+	while( index < dataSize && ! dev_pointMoved[0] )
 	{
-		if(moved[index] == true){ pointMoved = true ; }
+		if(moved[index] == true){ dev_pointMoved[0] = true ; }
 		index++;
 	}
 }
 
+
+
+// if at least one point has moved during the last iteration of the 
+// kmeans algorithm, then go through each point in the data set and
+// update their groups
 __global__
-void updateGroup(Point*& data, int dataSize, 
-	 			float& sumX1, float& sumY1, 
-				float& sumX2, float& sumY2, int& count1, int& count2) 
+void updateGroup(Point*& data, int dataSize, float* sums, int* counts) 
 {
 
-/*	int p =  blockIdx.x * blockDim.x + threadIdx.x;
+	int p =  blockIdx.x * blockDim.x + threadIdx.x;
 
 	if( p < dataSize )
 	{
 		if( data[p].group == 1)
 		{
-			sumX1 += data[p].x; sumY1 += data[p].y;
-			count1++;
+			sums[0] += data[p].x; sums[1] += data[p].y;
+			counts[0]++;
 		}
 		else
 		{
-			sumX2 += data[p].x; sumY2 += data[p].y;
-			count2++;
+			sums[2] += data[p].x; sums[3] += data[p].y;
+			counts[1]++;
 		}
-	}*/
+	}
 }
+
+
+
 
 
 
@@ -132,8 +142,6 @@ int main(int argc, char* argv[])
 	cudaMallocManaged( &data, dataSize * sizeof(Point) );
 	bool* moved;
 	cudaMallocManaged( &moved, dataSize * sizeof(bool) );
-	Point* dataTemp  = new Point[dataSize];
-
 
 
 
@@ -141,7 +149,7 @@ int main(int argc, char* argv[])
 	int blockSize = 1024;
 	int blockNum = (dataSize + blockSize - 1) / blockSize;
 
-
+	Point* dataTemp  = new Point[dataSize];
 	for(int i = 0; i < groupSize; ++i)
 	{
 		Point p;
@@ -163,7 +171,7 @@ int main(int argc, char* argv[])
 		sumX += p.x;
 		p.y = min2 + rand() % (max2 - min2);
 		sumY += p.y;
-		dataTemp[i + min2]=p;
+		dataTemp[i + groupSize]=p;
 	}
 	expected2.x = sumX/groupSize;
 	expected2.y = sumY/groupSize;
@@ -187,76 +195,104 @@ int main(int argc, char* argv[])
 	*/
 //-----------------------------------------------------------
 
-	// 2 random points over the whole domain and range
-	Point center1, center2; 
-	center1.x = min1 + rand() % (max2-min1);
-	center1.y = min1 + rand() % (max2-min1);
-	center2.x = min1 + rand() % (max2-min1);
-	center2.y = min1 + rand() % (max2-min1);
+	// Random points over the whole domain and range, declared at main memory
+	Point* centers = new Point[2]; 
+	centers[0].x = min1 + rand() % (max2-min1);
+	centers[0].y = min1 + rand() % (max2-min1);
+	centers[1].x = min1 + rand() % (max2-min1);
+	centers[1].y = min1 + rand() % (max2-min1);
 
-	bool pointMoved = true;
-	while( pointMoved )
+	// Centroids declared in GPU memory 
+	Point* dev_centers;
+	cudaMallocManaged(&dev_centers, 2 * sizeof(Point));
+	// Transfer data from main to gpu mem
+	cudaMemcpy(dev_centers, centers, 2 * sizeof( Point ), cudaMemcpyHostToDevice);
+
+
+
+	// sums and counts are used to update the centers and the groups for
+	// each point
+	float* sums = new float[4];
+	for(int s = 0; s < 4; ++s) sums[s] = 0;
+	float* dev_sums;
+	cudaMallocManaged(&dev_sums, 4 * sizeof(float));
+
+	int* counts = new int[2];
+	counts[0] = 1; counts[1] = 1;
+	int* dev_counts;
+	cudaMallocManaged(&dev_counts, 2 * sizeof(int));
+
+
+	bool* pointMoved = new bool[1]; 
+	pointMoved[0] = true;
+
+	// gpu version of pointMoved variable
+	bool* dev_pointMoved;
+	cudaMallocManaged(&dev_pointMoved, sizeof(bool));
+
+	while( pointMoved[0] )
 	{
 
-		std::cout << "Center1 = (" << center1.x << ", " 
-							   	   << center1.y << ")\n";
-		std::cout << "Center2 = (" << center2.x << ", " 
-							   	   << center2.y << ")\n";
+		std::cout << "Center1 = (" << centers[0].x << ", " 
+							   	   << centers[0].y << ")\n";
+		std::cout << "Center2 = (" << centers[1].x << ", " 
+							   	   << centers[1].y << ")\n";
 
-		pointMoved = false;
+		pointMoved[0] = false;
 		// set the "moved" status for all the points to false
 		setFalse<<<blockNum, blockSize>>>(moved, dataSize);
 		cudaDeviceSynchronize();
 
-		
+
+
+		// compared to C++: replaced loop for determining membership with a 
+		// kernel. Instead, now there is a loop that goes over a bool array.
+		// GPU performance should be better.
+		findGroup<<<blockNum, blockSize>>>(data, dataSize, dev_centers, moved);
+		cudaDeviceSynchronize();
+
+		// copy from pointMoved to dev_pointMoved to use in kernel
+		cudaMemcpy(dev_pointMoved, pointMoved, sizeof( bool ), cudaMemcpyHostToDevice);
+
+		findMoved<<<1, 1>>>(moved, dataSize, dev_pointMoved);
+		cudaDeviceSynchronize();
+		cudaMemcpy(pointMoved, dev_pointMoved, sizeof( bool ), cudaMemcpyDeviceToHost);
+
+
+		// Code segment to see if the "moved" array isbeing updated properly
 		/*bool* movedCopy = new bool[dataSize];
 		cudaMemcpy(movedCopy, moved, dataSize*sizeof(bool), cudaMemcpyDeviceToHost);
 		for( int i = 0; i < dataSize; ++i)
 		{
 			std::cout << movedCopy[i] << "\n";
 		}
-		cudaDeviceSynchronize();	*/
-
-		// compared to C++: replaced loop for determining membership with a 
-		// kernel. Instead, now there is a loop that goes over a bool array.
-		// GPU performance should be better.
-		findGroup<<<blockNum, blockSize>>>(data, dataSize, center1, center2, moved);
-		cudaDeviceSynchronize();
-
-		findMoved<<<1, 1>>>(moved, dataSize, pointMoved);
-		cudaDeviceSynchronize();
+		cudaDeviceSynchronize();*/
 	
-		std::cout << pointMoved << " \n";
-		if( pointMoved )
+
+
+		std::cout << pointMoved[0] << " \n";
+		if( pointMoved[0] )
 		{
-			float sumX1 = 0, sumY1 = 0, sumX2 = 0, sumY2 = 0;
-			int count1 = 1, count2 = 1;
-			/*
-			for( int p = 0; p < dataSize; ++p )
-			{
-				if( data[p].group == 1)
-				{
-					sumX1 += data[p].x; sumY1 += data[p].y;
-					count1++;
-				}
-				else
-				{
-					sumX2 += data[p].x; sumY2 += data[p].y;
-					count2++;
-				}
-			}
-			*/
-			//updateGroup<<<blockNum, blockSize>>>(
-			//		data, dataSize, sumX1, sumY1, sumX2, sumY2, count1, count2);
-			//cudaDeviceSynchronize();
+
+			cudaMemcpy(dev_sums, sums, 4 * sizeof( float ), cudaMemcpyHostToDevice);
+			cudaMemcpy(dev_counts, counts, 2 * sizeof( int ), cudaMemcpyHostToDevice);
 	
-			center1.x = sumX1 / count1;
-			center1.y = sumY1 / count1;
-			center2.x = sumX2 / count2;
-			center2.y = sumY2 / count2;
+			// Since a point has moved, update every points group
+			updateGroup<<<blockNum, blockSize>>>(data, dataSize, dev_sums, dev_counts);
+			cudaDeviceSynchronize();
+
+			cudaMemcpy(sums, dev_sums, 4 * sizeof( float ), cudaMemcpyDeviceToHost);
+			cudaMemcpy(counts, dev_counts, 2 * sizeof( int ), cudaMemcpyDeviceToHost);
+
+			centers[0].x = sums[0] / counts[0];
+			centers[0].y = sums[1] / counts[0];
+			centers[1].x = sums[2] / counts[1];
+			centers[1].y = sums[3] / counts[1];
+
 		}
 
 		//std::cin.get();
+		cudaMemcpy(centers,dev_centers, 2 * sizeof( Point ), cudaMemcpyDeviceToHost);
 
 	}
 
@@ -266,16 +302,23 @@ int main(int argc, char* argv[])
 	std::cout << "Expected2 = (" << expected2.x << ", " 
 								 << expected2.y << ")\n";
 
-	std::cout << "Center1 = (" << center1.x << ", " 
-							   << center1.y << ")\n";
-	std::cout << "Center2 = (" << center2.x << ", " 
-							   << center2.y << ")\n";
+	std::cout << "Center1 = (" << centers[0].x << ", " 
+							   << centers[0].y << ")\n";
+	std::cout << "Center2 = (" << centers[1].x << ", " 
+							   << centers[1].y << ")\n";
 
 
 
-	//cudaFree(&data);
-	//cudaFree(&moved);
-	//delete [] dataTemp;
+	cudaFree(&data);
+	cudaFree(&moved);
+	delete [] dataTemp;
+	delete [] pointMoved;
+	cudaFree( &dev_pointMoved);
+
+	delete [] sums;
+	cudaFree( &dev_sums);
+	delete [] counts;
+	cudaFree( &dev_counts);
 
 }
 
